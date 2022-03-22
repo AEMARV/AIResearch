@@ -10,7 +10,7 @@ from src.layers import Fold
 from src.layers import Sampler
 import math
 from src.utils import softmax
-import monai.networks.nets.unet as UNET
+from monai.networks.nets import UNet
 class PancModel(nn.Module):
 
     def __init__(self,layers=12,classnum=-1,num_filter=64,filter_scale=1):
@@ -277,5 +277,6 @@ class Panc_Seg_Bottled(nn.Module):
         return y
 
 
-def unet():
-    UNET()
+def unet(*args,**kwargs):
+    module =UNet(spatial_dims=3,in_channels=1,out_channels=2,channels=(4,8,16,32,64),strides=(2,2,2,2),num_res_units=3)
+    return module

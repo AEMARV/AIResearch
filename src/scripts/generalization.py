@@ -56,8 +56,8 @@ if __name__ == '__main__':
         select_data= select_data.fillna(value=0)
         select_data = select_data.sort_values(by='Objective Function')
         print(select_data)
-        plot = sns.lineplot(data=select_data,x='alpha',y='dice_val  ',hue='Objective Function',linewidth=2)
-        plot.set(ylabel='Test Accuracy',xlabel='alpha',title='Test Accuracy For Varying Loss Functions')
+        plot = sns.lineplot(data=select_data,x='layers',y='IOU_val  ',hue='Objective Function',linewidth=2)
+        # plot.set(ylabel='Test Accuracy',xlabel='alpha',title='Test Accuracy For Varying Loss Functions')
         plot.get_figure().savefig(os.path.join(stat_path,dataset+'_val_acc.png'))
 
 

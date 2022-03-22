@@ -29,7 +29,7 @@ if __name__ == '__main__':
 		   "where in hyper normalization as opposed to the original, the original input is not used."
 	augment_rate = 0
 	datasets= [(nih_pancreas,2)]
-	alpha_list=[2,4,16,1.5,2.5,3,3.5]
+	alpha_list=[1,2,3,4,5,6]
 	l1_list = [0]
 	l2_list = l1_list
 	exp_list = []
@@ -38,12 +38,12 @@ if __name__ == '__main__':
 			for alpha in alpha_list:
 				for numlayers in [8,10,12,14]:
 					for dataset,classnum in datasets:
-						for scale in [1,2]:
+						for scale in [1]:
 							for lr in [0.001,0.005]:
 								for init_coef in [0.1,0.01,0.001,1]:
 									for optimizer in [Subset_Seg_Balanced]:
-										for model in [
-													Panc_Seg_Bottled,
+										for model in [unet,
+													# Panc_Seg_Bottled,
 													# Panc_Segmentation,
 													  ]:
 											exp_desc = dict(trial=trial,
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
 	print(exp_list.__len__())
 	for exp_dict in exp_list:
-		exp = Trainings_SimpleCIFAR10('PancSegmentBottled', description=desc,worker_id=worker_id)
+		exp = Trainings_SimpleCIFAR10('UNet', description=desc,worker_id=worker_id)
 		exp.generic_train(**exp_dict)
 	#
 

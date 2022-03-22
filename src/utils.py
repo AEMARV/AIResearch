@@ -63,10 +63,10 @@ def prob_wrapper(out):
 
 def copy_code(dst_path,rootpath=PATH_ROOT):
     import shutil
-    rootpath = Path(rootpath)
-    dst_path = Path(dst_path)
-    src_dst_path= Path(dst_path,'src')
-    srcpath = Path(rootpath,'src')
+    rootpath = Path(os.path.abspath(rootpath))
+    dst_path = Path(os.path.abspath(dst_path))
+    src_dst_path= Path(dst_path,u'src')
+    srcpath = Path(rootpath,u'src')
 
     if os.path.exists(dst_path):
         shutil.rmtree(dst_path)
@@ -77,7 +77,7 @@ def copy_code(dst_path,rootpath=PATH_ROOT):
         pass
     for file in os.listdir('.'):
         if file.split('.')[-1]=='py':
-            filepath = os.path.join('.',file)
+            filepath = os.path.abspath( os.path.join(u'.',file))
             shutil.copy(filepath,dst_path)
     return
 
@@ -90,14 +90,22 @@ def softmax(x1,x2):
     return out
 
 def dict_filename(dictionary):
-    print(dictionary)
+    # print(dictionary)
+    string = "s_"
+    for key,val in dictionary.items():
+        # string = string + key
+        # string = string+ "="
+        string = string+ str(val)
+        string = string + "_"
+    string= string+"_e"
+    return string
+def dict_to_str(dictionary):
     string = ""
     for key,val in dictionary.items():
         string = string + key
         string = string+ "="
         string = string+ str(val)
-        string = string + "_"
-    string= string+"exp"
+        string = string + "\n"
     return string
 
 

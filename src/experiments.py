@@ -211,10 +211,10 @@ class Trainings_SimpleCIFAR10(Experiment):
 		self.path = os.path.join('.', 'Results', self.folder_name)
 		if not os.path.exists(self.path):
 			os.makedirs(self.path)
-		desc_path = os.path.join(self.path, 'description.txt')
-		if os.path.exists(desc_path):
-			os.remove(desc_path)
-		dsc_file = open(desc_path, mode='x')
+		self.desc_path = os.path.join(self.path, 'description.txt')
+		if os.path.exists(self.desc_path):
+			os.remove(self.desc_path)
+		dsc_file = open(self.desc_path, mode='x')
 		dsc_file.write(self.description)
 		dsc_file.close()
 
@@ -222,6 +222,7 @@ class Trainings_SimpleCIFAR10(Experiment):
 		self.writer= None
 		self.result_dict={}
 		self.path = os.path.join('.','Results',self.folder_name)
+
 
 	def generic_train(self,trial=1, alpha=2,
 					  augment_rate=0,
@@ -263,7 +264,14 @@ class Trainings_SimpleCIFAR10(Experiment):
 		os.makedirs(self.path, exist_ok=True)
 		code_path = os.path.join(self.path, 'Code')
 		os.makedirs(code_path,exist_ok=True)
-		print("Codepath : " + code_path)
+		# Create setup description file
+		setup_desc_path = os.path.join(self.path, 'setup.txt')
+		if os.path.exists(setup_desc_path):
+			os.remove(setup_desc_path)
+		setup_txt = dict_to_str(setup)
+		dsc_file = open(setup_desc_path, mode='x')
+		dsc_file.write("Setup : \n\n" + setup_txt)
+		dsc_file.close()
 		copy_code(code_path,rootpath=self.temp_code_path)
 		result = self.train_all(model,
 								optimizer,
