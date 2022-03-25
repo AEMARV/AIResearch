@@ -327,8 +327,10 @@ class NIH_Pancreas(Dataset):
         vol = vol.unsqueeze(0)
         label = label.unsqueeze(0).unsqueeze(0)
         scale = 6
-        vol = F.interpolate(vol,[int(x/scale) for x in vol.shape[2:]])
-        label = F.interpolate(label,[int(x/scale) for x in label.shape[2:]])
+        sz = [int(x/scale) for x in vol.shape[2:]]
+        sz = [96,96,48]
+        vol = F.interpolate(vol,sz)
+        label = F.interpolate(label,sz)
         vol = vol.squeeze(dim=0)
         label = label.squeeze(dim=0)
         label = torch.cat([label,1-label],dim=0)
@@ -410,8 +412,12 @@ class Mayo_Pancreas(Dataset):
         label = (self.load_label(id)>0).int()
         vol = vol.unsqueeze(dim=0).unsqueeze(dim=0)
         scale = 6
-        vol = F.interpolate(vol,[int(x/scale) for x in vol.shape[2:]])
-        # vol = vol.squeeze(dim=0)
+        sz= 64#int(x/scale)
+        # vol = F.interpolate(vol,[sz for x in vol.shape[2:]])
+        # print(vol.shape)
+        vol = F.interpolate(vol,[96,96,24])
+        # print(vol.shape)
+        vol = vol.squeeze(dim=0)
         # label = torch.cat([label,1-label],dim=0)
         vol = vol*2 -1
 

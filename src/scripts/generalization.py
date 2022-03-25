@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 if __name__ == '__main__':
     for dataset in ['nih_pancreas']:
-        expdir =os.path.join('..','..','Results','PancSegmentBottled')
+        expdir =os.path.join('..','..','Results','UNet')
         models_dir = os.path.join(expdir,dataset)
         stat_path = os.path.join(expdir,'stats','generalization')
         os.makedirs(stat_path,exist_ok=True)
@@ -56,7 +56,7 @@ if __name__ == '__main__':
         select_data= select_data.fillna(value=0)
         select_data = select_data.sort_values(by='Objective Function')
         print(select_data)
-        plot = sns.lineplot(data=select_data,x='layers',y='IOU_val  ',hue='Objective Function',linewidth=2)
+        plot = sns.lineplot(data=select_data,x='alpha',y='dice_val  ',hue='Objective Function',linewidth=2)
         # plot.set(ylabel='Test Accuracy',xlabel='alpha',title='Test Accuracy For Varying Loss Functions')
         plot.get_figure().savefig(os.path.join(stat_path,dataset+'_val_acc.png'))
 

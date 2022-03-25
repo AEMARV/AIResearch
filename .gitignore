@@ -1,3 +1,9 @@
 /Results/*
-/data/*
-*.dcm
+/data
+/data/NIH_pancreas
+/data/
+/data/NIH_pancreas/
+/data/NIH_pancreas/Pancreas-CT/PANCREAS_0016/
+.idea
+Results
+data

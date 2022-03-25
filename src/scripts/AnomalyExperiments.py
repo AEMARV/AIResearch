@@ -50,7 +50,7 @@ def calc_auroc(df1:pd.DataFrame,df2:pd.DataFrame,score):
     label2 = np.zeros_like(score2)
     all_scores = np.concatenate([score1,score2],axis=0)
     all_scores[all_scores!=all_scores]=0
-    all_labels=  np.concatenate([label1,label2],axis=0)
+    all_labels = np.concatenate([label1,label2],axis=0)
     auroc = roc_auc_score(all_labels,all_scores)
     negauroc = roc_auc_score(all_labels,-all_scores)
     auroc_final = auroc

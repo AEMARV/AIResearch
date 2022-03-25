@@ -278,5 +278,15 @@ class Panc_Seg_Bottled(nn.Module):
 
 
 def unet(*args,**kwargs):
-    module =UNet(spatial_dims=3,in_channels=1,out_channels=2,channels=(4,8,16,32,64),strides=(2,2,2,2),num_res_units=3)
-    return module
+    network = UNet(
+        spatial_dims=3,
+        in_channels=1,
+        out_channels=2,
+        channels=(8, 16, 32, 32, 16),
+        strides=(1, 2, 2, 3),
+        kernel_size=5,
+        up_kernel_size=3,
+        num_res_units=5,
+        norm="batch"
+    )
+    return network

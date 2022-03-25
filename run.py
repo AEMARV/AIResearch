@@ -36,11 +36,11 @@ if __name__ == '__main__':
 	for trial in range(1):
 		for batch_size in [1]:
 			for alpha in alpha_list:
-				for numlayers in [8,10,12,14]:
+				for numlayers in [1]:
 					for dataset,classnum in datasets:
 						for scale in [1]:
-							for lr in [0.001,0.005]:
-								for init_coef in [0.1,0.01,0.001,1]:
+							for lr in [0.001,0.01]:
+								for init_coef in [0]:
 									for optimizer in [Subset_Seg_Balanced]:
 										for model in [unet,
 													# Panc_Seg_Bottled,
