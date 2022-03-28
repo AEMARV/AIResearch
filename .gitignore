@@ -4,7 +4,8 @@
 /data/
 /data/NIH_pancreas/
 /data/NIH_pancreas/Pancreas-CT/PANCREAS_0016/
-.idea
+#.idea
 Results
 data
 temp
+#.idea/vcs.xml

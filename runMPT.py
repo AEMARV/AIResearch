@@ -45,6 +45,7 @@ if __name__ == '__main__':
 				 Joint_Intersection_Indpt]
 	model_list = [BottleNet,SimpleCIFAR10,resnet_cifar_nmnist]
 
+
 	for trial in range(total_trials):
 		for batch_size in [128]:
 			for alpha in alpha_list:
