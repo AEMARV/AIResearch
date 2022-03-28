@@ -241,7 +241,7 @@ class Trainings_SimpleCIFAR10(Experiment):
                       l1=0,
                       init_coef=1,
                       model=SimpleCIFAR10,
-                      loss=Joint_Subset,
+                      loss=Joint_Intersection_Subset,
                       optimizer=SGD,
                       dataset=cifar10, name="",
                       classnum=-1):

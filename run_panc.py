@@ -43,7 +43,7 @@ if __name__ == '__main__':
 								for init_coef in [0]:
 									for optimizer in [Subset_Seg_Balanced]:
 										for model in [unet,
-													# Panc_Seg_Bottled,
+													Panc_Seg_Bottled,
 													# Panc_Segmentation,
 													  ]:
 											exp_desc = dict(trial=trial,
@@ -60,7 +60,7 @@ if __name__ == '__main__':
 															dataset=dataset,
 															classnum=classnum,
 															optimizer=optimizer)
-										exp_list = exp_list +[exp_desc]
+											exp_list = exp_list +[exp_desc]
 
 	worker_id= 1
 	total_workers=1

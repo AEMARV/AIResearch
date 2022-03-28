@@ -29,15 +29,15 @@ if __name__ == '__main__':
 		   "where in hyper normalization as opposed to the original, the original input is not used."
 	augment_rate = 0
 	exp_list = []
-	total_trials= 2
+	total_trials= 1
 	datasets= [(cifar10,10),(cifar100,100),(mnist,10)]
 
 	alpha_list=[1,2,3,4,5,6]
 	l1_list = [0]
 	l2_list = l1_list
 	numlayers_list= [8, 12, 16]
-	lr_list = [0.01,0.001,0.0001]
-	init_coef_list = [1,0.1,10]
+	lr_list = [0.001,0.0001]
+	init_coef_list = [1,0.1]
 	optimizer_list = [SGD]
 	loss_list = [Conditional_Cross,
 				 Joint_Cross,
@@ -77,15 +77,71 @@ if __name__ == '__main__':
 														exp_list = exp_list +[exp_desc]
 
 	alpha_list = [1]
-	l1_list = [0,2e-5,4e-5,8e-5,16e-5]
+	l1_list = [2e-5,4e-5,8e-5,16e-5]
 	l2_list = [0]
 
-
+	for trial in range(total_trials):
+		for batch_size in [128]:
+			for alpha in alpha_list:
+				for numlayers in numlayers_list:
+					for dataset,classnum in datasets:
+						for scale in [1]:
+							for l1 in l1_list:
+								for l2 in l2_list:
+									for lr in lr_list:
+										for init_coef in init_coef_list:
+											for optimizer in optimizer_list :
+												for loss in loss_list:
+													for model in model_list:
+														exp_desc = dict(trial=trial,
+																		lr=lr,
+																		l2=l2,
+																		l1=l1,
+																		init_coef=init_coef,
+																		filter_scale=scale,
+																		momentum=0.9,
+																		batchsz=batch_size,
+																		alpha=alpha,
+																		model=model,
+																		num_layer=numlayers,
+																		dataset=dataset,
+																		classnum=classnum,
+																		optimizer=optimizer,
+																		loss=loss)
+														exp_list = exp_list +[exp_desc]
 	alpha_list = [1]
 	l1_list = [0]
-	l2_list = [0, 2e-5, 4e-5, 8e-5, 16e-5]
+	l2_list = [2e-5, 4e-5, 8e-5, 16e-5]
 
-
+	for trial in range(total_trials):
+		for batch_size in [128]:
+			for alpha in alpha_list:
+				for numlayers in numlayers_list:
+					for dataset,classnum in datasets:
+						for scale in [1]:
+							for l1 in l1_list:
+								for l2 in l2_list:
+									for lr in lr_list:
+										for init_coef in init_coef_list:
+											for optimizer in optimizer_list :
+												for loss in loss_list:
+													for model in model_list:
+														exp_desc = dict(trial=trial,
+																		lr=lr,
+																		l2=l2,
+																		l1=l1,
+																		init_coef=init_coef,
+																		filter_scale=scale,
+																		momentum=0.9,
+																		batchsz=batch_size,
+																		alpha=alpha,
+																		model=model,
+																		num_layer=numlayers,
+																		dataset=dataset,
+																		classnum=classnum,
+																		optimizer=optimizer,
+																		loss=loss)
+														exp_list = exp_list +[exp_desc]
 
 	worker_id= 1
 	total_workers=1
