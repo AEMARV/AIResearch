@@ -3,7 +3,7 @@ import sys
 sys.path.append('..')
 sys.path.append('../..')
 from src.data import *
-from src.optimizers import *
+from src.losses import *
 import os
 import pandas as pd
 import seaborn as sns

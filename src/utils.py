@@ -90,6 +90,12 @@ def softmax(x1,x2):
     return out
 
 def dict_filename(dictionary):
+    '''
+    For a dictionary creates a filename consisted of numbers
+    the dictionary is hashed and the remainder with 2^32 is the filename.
+    :param dictionary:
+    :return:
+    '''
     # print(dictionary)
     string = "s_"
     for key,val in dictionary.items():
@@ -98,6 +104,8 @@ def dict_filename(dictionary):
         string = string+ str(val)
         string = string + "_"
     string= string+"_e"
+    string = str(hash(string)%(2**32))
+
     return string
 def dict_to_str(dictionary):
     string = ""
