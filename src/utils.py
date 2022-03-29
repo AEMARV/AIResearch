@@ -4,7 +4,7 @@ import torch
 import sys
 from src.globals import *
 from pathlib import Path as Path
-
+import hashlib
 
 def force_replace_path(pathlist: List[str]) -> str:
     full_path = ''
@@ -104,7 +104,7 @@ def dict_filename(dictionary):
         string = string+ str(val)
         string = string + "_"
     string= string+"_e"
-    string = str(hash(string)%(2**32))
+    string = hashlib.md5(string.encode()).hexdigest()
 
     return string
 def dict_to_str(dictionary):

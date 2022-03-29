@@ -123,7 +123,7 @@ def create_summary_entry(df:DataFrame)->dict:
 
 if __name__ == '__main__':
     if sys.argv.__len__()<2:
-        expname = 'Selected'
+        expname = 'SortedValueExp'
     else:
         expname = sys.argv[1]
     # print("Evaluating " + expname + " on Mayo")
@@ -135,7 +135,10 @@ if __name__ == '__main__':
         if model_dir.split('.')[-1] == 'txt':
             continue
         model_path = join(models_path,model_dir,'model.pth')
-        result_dict = torch.load(join(models_path,model_dir,'result.dict')) #type:dict
+        try:
+            result_dict = torch.load(join(models_path,model_dir,'result.dict')) #type:dict
+        except Exception:
+            continue
         setup_dict= result_dict['setup']
         # print(result_dict.keys())
         scalar_dict = result_dict['scalars']

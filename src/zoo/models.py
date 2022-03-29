@@ -287,7 +287,7 @@ class Panc_Segmentation(nn.Module):
 class Panc_Seg_Bottled(nn.Module):
     def __init__(self, layers=12, classnum=2, num_filter=64, filter_scale=1,init_coef=1):
         num_filter = math.ceil(num_filter * filter_scale)
-        filternums = (layers-1)*(num_filter,) + (classnum,)
+        filternums = (layers-1)*(filter_scale*num_filter,) + (classnum,)
         super().__init__()
         self.init_coef =init_coef
 
@@ -322,7 +322,7 @@ class Panc_Seg_Bottled(nn.Module):
 
             block =(layer,layer2)
             self.blocks = self.blocks+ [block]
-            in_channel = num_filter*2
+            in_channel = filternum*2
 
 
 

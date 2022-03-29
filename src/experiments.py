@@ -250,7 +250,7 @@ class Trainings_SimpleCIFAR10(Experiment):
                       init_coef=init_coef)  # type: torch.nn.Module
         optimizer = optimizer(lr=lr, momentum=momentum, l1=l1, l2=l2)
         loss = loss(alpha, classnum, augment_rate, lr=lr, momentum=momentum, l1=l1, l2=l2)
-        train_dataldr, test_dataldr = dataset(batchsz)
+        train_dataldr, test_dataldr = dataset(batchsz,num_worker=4)
         ## Create Results folder
         setup = dict(model_name=model.__class__.__name__,
                      optimizer=optimizer.__class__.__name__,

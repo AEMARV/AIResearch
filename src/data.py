@@ -21,8 +21,17 @@ from pathlib import Path
 import monai
 import nibabel
 import pandas
-
+import monai.data.nifti_writer as nifti_writer
 ssl._create_default_https_context = ssl._create_unverified_context
+
+
+def convert_qunatile(x):
+    sh = x.shape
+    x = x.flatten().argsort().argsort().reshape(sh)
+    x = 2 * x / x.max()
+    x = x - 1
+    return x
+
 def cifar10(batchsz, isshuffle=True):
     # Obtain options from opts class
     transform = transforms.Compose(
@@ -245,6 +254,7 @@ def panc_nih(batchsz,isshuffle=True,transform=[],num_worker=1):
 class NIH_Pancreas(Dataset):
     def __init__(self,root_dir=None,subset='train'):
         self.subset = subset
+        self.sz = [96,96,48]
         if not root_dir:
             root_dir = '.'
 
@@ -254,6 +264,19 @@ class NIH_Pancreas(Dataset):
         self.label_files_template = os.path.join(label_dir,'label{}.nii.gz')
         self.id_list = {'train':["%04d"%i for i in range(1,65)],
                    'test':["%04d"%i for i in range(65,83)]}[self.subset]
+
+        ### Create Clean Dataset
+        self.id_list_all = ["%04d"%i for i in range(1,83)]
+        temp = ''
+        for x in self.sz:
+            temp = temp + str(x)
+        self.clean_root= os.path.join(self.root_dir,'Clean{}'.format(str(temp)))
+        self.clean_img_path = os.path.join(self.clean_root, 'img%04d.nii.gz')
+        self.clean_label_path = os.path.join(self.clean_root, 'label%04d.nii.gz')
+        if not os.path.exists(self.clean_root):
+            os.makedirs(self.clean_root)
+            self.create_clean()
+
 
         pass
 
@@ -309,7 +332,50 @@ class NIH_Pancreas(Dataset):
         x = x.unsqueeze(0)
         return x,crop_index
 
-    def __getitem__(self, idx):
+    def create_clean(self):
+        for i in range(82):
+            # read data
+            # read label
+            vol, label = self.get_original_item(i)
+            if not os.path.exists(self.clean_img_path%i):
+                print(i,',',end='\r')
+                nifti_writer.write_nifti(vol, self.clean_img_path % i)
+            if not os.path.exists(self.clean_label_path%i):
+                nifti_writer.write_nifti(label, self.clean_label_path % i)
+
+
+
+
+    def get_original_item(self,idx):
+        idx = self.id_list_all[idx]
+        scan_dir =self.scan_dir.format(idx)
+        vol = self.load_volume(path_volume=scan_dir,percentile=0)
+        vol = vol.unsqueeze(dim=0)
+        label = sitk.GetArrayFromImage(sitk.ReadImage(self.label_files_template.format(idx))).transpose(1,2,0).astype(np.uint8)
+        label= torch.tensor(label,dtype=torch.uint8)
+        # vol, indices = self.crop_volume(vol,cut_val=0.2)
+        # for index_tuple in indices:
+        #     dim = index_tuple[0]
+        #     indices = index_tuple[1:]
+        #     print(index_tuple)
+        #     label = label.transpose(0,dim)
+        #     label = label[indices[0]:indices[1]]
+        #     label = label.transpose(0,dim)
+        vol = vol.unsqueeze(0)
+        label = label.unsqueeze(0).unsqueeze(0)
+        scale = 6
+        # sz = [int(x/scale) for x in vol.shape[2:]]
+        sz = [96,96,48]
+        vol = F.interpolate(vol,sz)
+        label = F.interpolate(label,sz)
+        vol = vol.squeeze(dim=0)
+        label = label.squeeze(dim=0)
+        label = torch.cat([label,1-label],dim=0)
+        vol = convert_qunatile(vol)
+
+        return vol.numpy(),label.numpy()
+
+    def getitem_deprecated(self, idx):
         idx = self.id_list[idx]
         scan_dir =self.scan_dir.format(idx)
         vol = self.load_volume(path_volume=scan_dir,percentile=0)
@@ -327,16 +393,24 @@ class NIH_Pancreas(Dataset):
         vol = vol.unsqueeze(0)
         label = label.unsqueeze(0).unsqueeze(0)
         scale = 6
-        sz = [int(x/scale) for x in vol.shape[2:]]
+        # sz = [int(x/scale) for x in vol.shape[2:]]
         sz = [96,96,48]
         vol = F.interpolate(vol,sz)
         label = F.interpolate(label,sz)
         vol = vol.squeeze(dim=0)
         label = label.squeeze(dim=0)
         label = torch.cat([label,1-label],dim=0)
-        vol = vol*2 -1
+        vol = convert_qunatile(vol)
 
         return vol,label
+
+    def __getitem__(self, idx):
+        vol = nibabel.load(self.clean_img_path%idx).get_fdata()
+        vol = torch.tensor(np.array(vol),dtype=torch.float32)
+        label = nibabel.load(self.clean_label_path%idx).get_fdata()
+        label = torch.tensor(np.array(label), dtype=torch.float32)
+        return vol, label
+
 
     def __len__(self):
         return self.id_list.__len__()
@@ -362,6 +436,8 @@ class Mayo_Pancreas(Dataset):
 
         pass
 
+
+
     def load_img(self,path_file:str):
         data = nibabel.load(path_file).get_fdata()
         vol = torch.tensor(np.array(data),dtype=torch.float32)
@@ -374,36 +450,6 @@ class Mayo_Pancreas(Dataset):
         T = torch.tensor(label.to_numpy(),dtype=torch.float32)
         return T
 
-    def load_dicom(self,path_file: str) -> Optional[np.ndarray]:
-        dicom = pydicom.dcmread(path_file)
-        # TODO: adjust spacing in particular dimension according DICOM meta
-        try:
-            img = apply_voi_lut(dicom.pixel_array, dicom).astype(np.float32)
-        except RuntimeError as err:
-            print(err)
-            return None
-        return img
-
-    def load_volume(self,path_volume: str, percentile: Optional[float] = 0.01) -> Tensor:
-        glob_path_slices = os.path.join(path_volume, '*.dcm')
-        path_slices = glob(glob_path_slices)
-        path_slices = sorted(path_slices, )
-        vol = []
-        for p_slice in path_slices:
-            img = self.load_dicom(p_slice)
-            if img is None:
-                continue
-            vol.append(img.T)
-        vol = np.stack(vol,axis=0)
-        volume = torch.tensor(vol, dtype=torch.float32)
-        if percentile is not None:
-            # get extreme values
-            p_low = np.quantile(volume, percentile) if percentile else volume.min()
-            p_high = np.quantile(volume, 1 - percentile) if percentile else volume.max()
-            # normalize
-            volume = (volume - p_low) / (p_high - p_low)
-        return volume.T
-
     def __getitem__(self, idx):
         img_path = self.id_list[idx]
         # scan_dir =self.scan_dir.format(idx)
@@ -415,12 +461,11 @@ class Mayo_Pancreas(Dataset):
         sz= 64#int(x/scale)
         # vol = F.interpolate(vol,[sz for x in vol.shape[2:]])
         # print(vol.shape)
-        vol = F.interpolate(vol,[96,96,24])
+        vol = F.interpolate(vol,[96,96,48])
         # print(vol.shape)
         vol = vol.squeeze(dim=0)
         # label = torch.cat([label,1-label],dim=0)
-        vol = vol*2 -1
-
+        vol = convert_qunatile(vol)
         return vol,label,img_path
 
     def __len__(self):
