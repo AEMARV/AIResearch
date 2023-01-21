@@ -178,7 +178,8 @@ class Experiment:
         if (os.path.exists(model_path)):
             model = torch.load(model_path)
             loss = torch.load(loss_path)
-            optimizer = torch.load(optimizer_path)
+            if os.path.exists(optimizer_path):
+                optimizer = torch.load(optimizer_path)
         if os.path.exists(result_path):
             result_dict = torch.load(result_path)
         else:
@@ -200,6 +201,9 @@ class Experiment:
             if save_result:
                 if not ISNAN:
                     torch.save(model, model_path)
+                res_str = dict_to_str(epochres)
+                with open(os.path.join(path,'final_result.txt'),mode='w') as f:
+                    f.write(res_str)
                 torch.save(optimizer, optimizer_path)
                 torch.save(loss, loss_path)
                 torch.save(result_dict, os.path.join(path, 'result.dict'))
@@ -209,9 +213,9 @@ class Experiment:
 
 
 class Trainings_SimpleCIFAR10(Experiment):
-    def __init__(self, res_folder_name, description='', *args, **kwargs):
+    def __init__(self, res_folder_name, description='', *args,epoch_num=200, **kwargs):
         super().__init__(*args, **kwargs)
-        self.epoch_num = 150
+        self.epoch_num = epoch_num
         self.folder_name = res_folder_name
         self.description = description
 
@@ -250,7 +254,7 @@ class Trainings_SimpleCIFAR10(Experiment):
                       init_coef=init_coef)  # type: torch.nn.Module
         optimizer = optimizer(lr=lr, momentum=momentum, l1=l1, l2=l2)
         loss = loss(alpha, classnum, augment_rate, lr=lr, momentum=momentum, l1=l1, l2=l2)
-        train_dataldr, test_dataldr = dataset(batchsz,num_worker=4)
+        train_dataldr, test_dataldr = dataset(batchsz,num_worker=12)
         ## Create Results folder
         setup = dict(model_name=model.__class__.__name__,
                      optimizer=optimizer.__class__.__name__,

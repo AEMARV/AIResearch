@@ -32,7 +32,7 @@ def convert_qunatile(x):
     x = x - 1
     return x
 
-def cifar10(batchsz, isshuffle=True):
+def cifar10(batchsz, isshuffle=True,num_worker=4):
     # Obtain options from opts class
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5])])
@@ -40,9 +40,9 @@ def cifar10(batchsz, isshuffle=True):
     trainset = tv.datasets.CIFAR10(PATH_DATA, train=True, download=True, transform=transform)
     testset = tv.datasets.CIFAR10(PATH_DATA, train=False, download=True, transform=transform)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=batchsz, shuffle=isshuffle, sampler=None,
-                                               num_workers=1)
+                                               num_workers=2)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=batchsz, shuffle=isshuffle, sampler=None,
-                                              num_workers=1)
+                                              num_workers=2)
     return train_loader, test_loader
 
 def cifar100(batchsz, isshuffle=True, transform=[]):
@@ -252,9 +252,14 @@ def panc_nih(batchsz,isshuffle=True,transform=[],num_worker=1):
     return trainloader,test_loader
 
 class NIH_Pancreas(Dataset):
-    def __init__(self,root_dir=None,subset='train'):
+    def __init__(self, root_dir=None, subset='train', resize=None, original_sz=False,sort=False):
+        if resize is None:
+            resize = [96, 96, 48]
         self.subset = subset
-        self.sz = [96,96,48]
+        self.sz = resize
+        self.original_sz = original_sz
+        self.sort=  sort
+        self.return_original_label=False
         if not root_dir:
             root_dir = '.'
 
@@ -262,15 +267,19 @@ class NIH_Pancreas(Dataset):
         self.scan_dir = os.path.join(self.root_dir,'Pancreas-CT','PANCREAS_{}','*','*')
         label_dir= os.path.join(self.root_dir,'Label')
         self.label_files_template = os.path.join(label_dir,'label{}.nii.gz')
-        self.id_list = {'train':["%04d"%i for i in range(1,65)],
-                   'test':["%04d"%i for i in range(65,83)]}[self.subset]
+        self.id_list = {'train':["%04d"%i for i in range(1,63)],
+                   'test':["%04d"%i for i in range(63,83)]}[self.subset]
 
         ### Create Clean Dataset
         self.id_list_all = ["%04d"%i for i in range(1,83)]
         temp = ''
         for x in self.sz:
             temp = temp + str(x)
-        self.clean_root= os.path.join(self.root_dir,'Clean{}'.format(str(temp)))
+        if original_sz:
+            name = 'Original_Sort=' + str(self.sort)
+            self.clean_root = os.path.join(self.root_dir, name)
+        else:
+            self.clean_root= os.path.join(self.root_dir,'Clean{}'.format(str(temp)))
         self.clean_img_path = os.path.join(self.clean_root, 'img%04d.nii.gz')
         self.clean_label_path = os.path.join(self.clean_root, 'label%04d.nii.gz')
         if not os.path.exists(self.clean_root):
@@ -309,28 +318,6 @@ class NIH_Pancreas(Dataset):
             # normalize
             volume = (volume - p_low) / (p_high - p_low)
         return volume.T
-    def crop_volume(self,x,cut_val=0.1):
-        means = x.mean()
-        crop_index = []
-        x = x.squeeze()
-        for dim in range(3):
-            x = x.transpose(0,dim)
-            y = x
-            y = (y-means).abs().sum(dim=(1,2))
-            y = y.cumsum(dim=0)
-            end_val = y[-1]
-            index_end = y<(1-cut_val)*end_val
-            index_begin = y > cut_val*end_val
-            index = index_begin & index_end
-            indices = np.where(index)
-            indices = indices[0]
-            indices = (int(indices[0]),int(indices[-1]))
-            crop_index = crop_index + [(dim,)+indices]
-            x= x[indices[0]:indices[-1],:]
-            x= x.transpose(0,dim)
-
-        x = x.unsqueeze(0)
-        return x,crop_index
 
     def create_clean(self):
         for i in range(82):
@@ -344,8 +331,14 @@ class NIH_Pancreas(Dataset):
                 nifti_writer.write_nifti(label, self.clean_label_path % i)
 
 
+    def get_original_label(self,idx):
+        idx = self.id_list[idx]
+        label = nibabel.load(self.label_files_template.format(idx)).get_fdata().transpose(1,0,2).astype(np.uint8)
+        label = torch.tensor(label, dtype=torch.uint8)
+        label = label.unsqueeze(0)
+        label = torch.cat([label, 1 - label], dim=0)
 
-
+        return label.numpy()
     def get_original_item(self,idx):
         idx = self.id_list_all[idx]
         scan_dir =self.scan_dir.format(idx)
@@ -353,25 +346,18 @@ class NIH_Pancreas(Dataset):
         vol = vol.unsqueeze(dim=0)
         label = sitk.GetArrayFromImage(sitk.ReadImage(self.label_files_template.format(idx))).transpose(1,2,0).astype(np.uint8)
         label= torch.tensor(label,dtype=torch.uint8)
-        # vol, indices = self.crop_volume(vol,cut_val=0.2)
-        # for index_tuple in indices:
-        #     dim = index_tuple[0]
-        #     indices = index_tuple[1:]
-        #     print(index_tuple)
-        #     label = label.transpose(0,dim)
-        #     label = label[indices[0]:indices[1]]
-        #     label = label.transpose(0,dim)
         vol = vol.unsqueeze(0)
         label = label.unsqueeze(0).unsqueeze(0)
-        scale = 6
-        # sz = [int(x/scale) for x in vol.shape[2:]]
-        sz = [96,96,48]
-        vol = F.interpolate(vol,sz)
-        label = F.interpolate(label,sz)
+        sz = self.sz
+        if not self.original_sz:
+            vol = F.interpolate(vol,sz)
+            label = F.interpolate(label,sz)
         vol = vol.squeeze(dim=0)
         label = label.squeeze(dim=0)
         label = torch.cat([label,1-label],dim=0)
-        vol = convert_qunatile(vol)
+        if self.sort:
+            vol = convert_qunatile(vol)
+
 
         return vol.numpy(),label.numpy()
 
@@ -407,13 +393,181 @@ class NIH_Pancreas(Dataset):
     def __getitem__(self, idx):
         vol = nibabel.load(self.clean_img_path%idx).get_fdata()
         vol = torch.tensor(np.array(vol),dtype=torch.float32)
-        label = nibabel.load(self.clean_label_path%idx).get_fdata()
-        label = torch.tensor(np.array(label), dtype=torch.float32)
+
+        if self.return_original_label:
+            orig_label = self.get_original_label(idx)
+            orig_label = torch.tensor(np.array(orig_label), dtype=torch.float32)
+            return vol,orig_label
+        else:
+            label = nibabel.load(self.clean_label_path%idx).get_fdata()
+            label = torch.tensor(np.array(label), dtype=torch.float32)
         return vol, label
 
 
     def __len__(self):
         return self.id_list.__len__()
+
+class NIH_Pancreas2D(Dataset):
+    def __init__(self, root_dir=None, subset='train', resize=None, original_sz=True):
+        self.subset = subset
+        self.return_original_label=True
+        if not root_dir:
+            root_dir = '.'
+
+        self.root_dir = os.path.join(root_dir,'data','NIH_pancreas')
+        self.scan_dir = os.path.join(self.root_dir,'Pancreas-CT','PANCREAS_{}','*','*')
+        label_dir= os.path.join(self.root_dir,'Label')
+        self.label_files_template = os.path.join(label_dir,'label{}.nii.gz')
+        self.id_list = {'train':["%04d"%i for i in range(1,63)],
+                   'test':["%04d"%i for i in range(63,83)]}[self.subset]
+        self.id_list_int ={'train':[i for i in range(0,62)],
+                   'test':[i for i in range(62,82)]}[self.subset]
+
+        ### Create Clean Dataset
+        self.id_list_all = ["%04d"%i for i in range(1,83)]
+        temp = ''
+        if original_sz:
+            name = 'Original_Nifti'
+            self.clean_root = os.path.join(self.root_dir, name)
+        self.clean_img_path = os.path.join(self.clean_root, 'img%04d.nii.gz')
+        self.clean_label_path = os.path.join(self.clean_root, 'label%04d.nii.gz')
+        if not os.path.exists(self.clean_root):
+            os.makedirs(self.clean_root)
+        self.create_clean()
+
+
+        pass
+
+    def load_dicom(self,path_file: str) -> Optional[np.ndarray]:
+        dicom = pydicom.dcmread(path_file)
+        # TODO: adjust spacing in particular dimension according DICOM meta
+        try:
+            img = apply_voi_lut(dicom.pixel_array, dicom).astype(np.float32)
+        except RuntimeError as err:
+            print(err)
+            return None
+        return img
+
+    def load_volume(self,path_volume: str, percentile: Optional[float] = 0.01) -> Tensor:
+        glob_path_slices = os.path.join(path_volume, '*.dcm')
+        path_slices = glob(glob_path_slices)
+        path_slices = sorted(path_slices, )
+        vol = []
+        for p_slice in path_slices:
+            img = self.load_dicom(p_slice)
+            if img is None:
+                continue
+            vol.append(img.T)
+        vol = np.stack(vol,axis=0)
+        volume = torch.tensor(vol, dtype=torch.float32)
+        if percentile is not None:
+            # get extreme values
+            p_low = np.quantile(volume, percentile) if percentile else volume.min()
+            p_high = np.quantile(volume, 1 - percentile) if percentile else volume.max()
+            # normalize
+            volume = (volume - p_low) / (p_high - p_low)
+        return volume.T
+
+    def create_clean(self):
+        for i in range(82):
+            # read data
+            # read label
+
+            if not os.path.exists(self.clean_img_path%i):
+                vol, label = self.get_original_item(i)
+                print(i,',',end='\r')
+                nifti_writer.write_nifti(vol, self.clean_img_path % i)
+            if not os.path.exists(self.clean_label_path%i):
+                vol, label = self.get_original_item(i)
+                nifti_writer.write_nifti(label, self.clean_label_path % i)
+
+
+    def get_original_label(self,idx):
+        idx = self.id_list[idx]
+        label = sitk.GetArrayFromImage(sitk.ReadImage(self.label_files_template.format(idx))).transpose(1, 2, 0).astype(
+            np.uint8)
+        label = torch.tensor(label, dtype=torch.uint8)
+        label = label.unsqueeze(0)
+        label = torch.cat([label, 1 - label], dim=0)
+
+        return label.numpy()
+    def get_original_item(self,idx):
+        idx = self.id_list_all[idx]
+        scan_dir =self.scan_dir.format(idx)
+        vol = self.load_volume(path_volume=scan_dir,percentile=0)
+        vol = vol.unsqueeze(dim=0)
+        label = sitk.GetArrayFromImage(sitk.ReadImage(self.label_files_template.format(idx))).transpose(1,2,0).astype(np.uint8)
+        label= torch.tensor(label,dtype=torch.uint8)
+        vol = vol.unsqueeze(0)
+        label = label.unsqueeze(0).unsqueeze(0)
+        vol = vol.squeeze(dim=0)
+        label = label.squeeze(dim=0)
+        label = torch.cat([label,1-label],dim=0)
+
+
+        return vol.numpy(),label.numpy()
+
+    def getitem_deprecated(self, idx):
+        idx = self.id_list[idx]
+        scan_dir =self.scan_dir.format(idx)
+        vol = self.load_volume(path_volume=scan_dir,percentile=0)
+        vol = vol.unsqueeze(dim=0)
+        label = sitk.GetArrayFromImage(sitk.ReadImage(self.label_files_template.format(idx))).transpose(1,2,0).astype(np.uint8)
+        label= torch.tensor(label,dtype=torch.uint8)
+        # vol, indices = self.crop_volume(vol,cut_val=0.2)
+        # for index_tuple in indices:
+        #     dim = index_tuple[0]
+        #     indices = index_tuple[1:]
+        #     print(index_tuple)
+        #     label = label.transpose(0,dim)
+        #     label = label[indices[0]:indices[1]]
+        #     label = label.transpose(0,dim)
+        vol = vol.unsqueeze(0)
+        label = label.unsqueeze(0).unsqueeze(0)
+        scale = 6
+        # sz = [int(x/scale) for x in vol.shape[2:]]
+        sz = [96,96,48]
+        vol = F.interpolate(vol,sz)
+        label = F.interpolate(label,sz)
+        vol = vol.squeeze(dim=0)
+        label = label.squeeze(dim=0)
+        label = torch.cat([label,1-label],dim=0)
+        vol = convert_qunatile(vol)
+
+        return vol,label
+
+    def __getitem__(self, idx):
+        img_idx = idx//512
+        img_idx = self.id_list_int[img_idx]
+        slice_idx = idx%512
+        vol = nibabel.load(self.clean_img_path%img_idx).get_fdata()
+        vol = torch.tensor(np.array(vol),dtype=torch.float32)
+
+        if not os.path.exists(self.clean_label_path % img_idx):
+            print("MESSSSSSED UP")
+        label = nibabel.load(self.clean_label_path % img_idx).get_fdata()
+        label = torch.tensor(np.array(label), dtype=torch.float32)
+
+        # label = self.get_original_label(img_idx)
+        # label = torch.tensor(np.array(label), dtype=torch.float32)
+        # print(img_idx, vol.shape, label.shape)
+
+        vol = vol[0:, 0:, slice_idx,0:]
+        label[0:1, 0:] = label[0:1, 0:] * (
+                label[1:, 0:].sum() / (label[0:1, 0:].sum() + 1))
+        label = label/label.sum()
+
+        label = label[0:, 0:,  slice_idx,0:]
+
+        # print("the sum is %d"%img_idx, print(label))
+        # print('the vol sum is %d'%img_idx,print(vol.sum()))
+        # label = torch.cat([label, 1 - label], dim=0)
+        return vol, label
+
+
+    def __len__(self):
+        return self.id_list.__len__()*512
+
 
 class Mayo_Pancreas(Dataset):
     def __init__(self,root_dir=None,subset='train'):
@@ -457,21 +611,15 @@ class Mayo_Pancreas(Dataset):
         vol = self.load_img(img_path)
         label = (self.load_label(id)>0).int()
         vol = vol.unsqueeze(dim=0).unsqueeze(dim=0)
-        scale = 6
-        sz= 64#int(x/scale)
-        # vol = F.interpolate(vol,[sz for x in vol.shape[2:]])
-        # print(vol.shape)
         vol = F.interpolate(vol,[96,96,48])
-        # print(vol.shape)
         vol = vol.squeeze(dim=0)
-        # label = torch.cat([label,1-label],dim=0)
         vol = convert_qunatile(vol)
         return vol,label,img_path
 
     def __len__(self):
         return self.id_list.__len__()
 
-def nih_pancreas(batchsz,isshuffle=True,root_dir=None,transform=[],num_worker=1):
+def nih_pancreas(batchsz,isshuffle=True,root_dir=None,transform=[],num_worker=1,return_original_too=False):
     panc_train_ds =  NIH_Pancreas(subset='train',root_dir=root_dir)
     train_loader = DataLoader(dataset=panc_train_ds,
                               batch_size= batchsz,
@@ -484,6 +632,18 @@ def nih_pancreas(batchsz,isshuffle=True,root_dir=None,transform=[],num_worker=1)
                               num_workers=num_worker)
     return train_loader,test_loader
 
+def nih_pancreas2d(batchsz,isshuffle=True,root_dir=None,transform=[],num_worker=4,return_original_too=False):
+    panc_train_ds =  NIH_Pancreas2D(subset='train',root_dir=root_dir)
+    train_loader = DataLoader(dataset=panc_train_ds,
+                              batch_size= batchsz,
+                              shuffle=isshuffle,
+                              num_workers=num_worker)
+    panc_test_ds = NIH_Pancreas2D(subset='test',root_dir=root_dir)
+    test_loader = DataLoader(dataset=panc_test_ds,
+                              batch_size=batchsz,
+                              shuffle=isshuffle,
+                              num_workers=num_worker)
+    return train_loader,test_loader
 
 def mayo_pancreas(batchsz,isshuffle=True,root_dir='.',transform=[],num_worker=1,subset='all'):
     panc_train_ds = Mayo_Pancreas(subset=subset, root_dir=root_dir)

@@ -4,7 +4,43 @@ import sys
 global server_mode
 from src.experiments import *
 from torch.optim import Adam
+from GUI import mainframecode
+import sys
+import multiprocessing as mp
+from multiprocessing import Queue as Queue
+from PyQt6.QtWidgets import QApplication, QWidget,QMainWindow
+import sys
+
+
+class hyperparam():
+    possible_types = ['num','choice']
+    def __init__(self,type,state,possibilities):
+        self.type = ['numerical', 'choice']
+        self.state = None
+        self.possiblities = []
+
+class setup():
+
+    def __init__(self, hyperparam_list):
+        self.hyper_params = hyperparam_list
+
+def launch_gui(queue:Queue,setup_obj):
+    app = QApplication(sys.argv)
+
+    # Create a Qt widget, which will be our window.
+    main_window = QMainWindow()
+    window = mainframecode.Ui_MainWindow(queue,setup_obj)
+    window.setupUi(main_window,setup_obj)
+    main_window.show()  # IMPORTANT!!
+    app.exec()
 if __name__ == '__main__':
+
+    GUI_P = mp.Process(target=launch_gui,name='gui_process',args=(None,None))
+    GUI_P.daemon = True
+    GUI_P.start()
+    GUI_P.join()
+
+
 
     # exp = NIN_Dropout(1)
     ''' Detect panc on NIH
@@ -27,6 +63,9 @@ if __name__ == '__main__':
            "" \
            "In addition to the previous objecrtive function a v2 for Joint version is experimented:\n" \
            "where in hyper normalization as opposed to the original, the original input is not used."
+
+
+
     augment_rate = 0
     exp_list = []
     total_trials = [2]
@@ -83,9 +122,9 @@ if __name__ == '__main__':
         total_workers = int(sys.argv[2])
         exp_list = exp_list[worker_id::total_workers]
     print("This worker is experimenting on total of %d settings" % exp_list.__len__())
-    for exp_dict in exp_list:
-        exp = Trainings_SimpleCIFAR10('Full_Scale', description=desc, worker_id=worker_id)
-        exp.generic_train(**exp_dict)
+    # for exp_dict in exp_list:
+    #     exp = Trainings_SimpleCIFAR10('Full_Scale', description=desc, worker_id=worker_id)
+    #     exp.generic_train(**exp_dict)
 #
 
 

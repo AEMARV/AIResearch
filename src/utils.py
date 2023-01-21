@@ -71,7 +71,7 @@ def copy_code(dst_path,rootpath=PATH_ROOT):
     if os.path.exists(dst_path):
         shutil.rmtree(dst_path)
     try:
-        os.makedirs(dst_path)
+        os.makedirs(dst_path,exist_ok=True)
         shutil.copytree(srcpath, src_dst_path,symlinks=False)
     except:
         pass

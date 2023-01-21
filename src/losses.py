@@ -1,6 +1,7 @@
 from torch import Tensor
 import math
 from src.utils import *
+from torch.nn.functional import interpolate
 class Loss(torch.nn.Module):
 
     def __init__(self,*args, l1=0, l2=0,**kwargs):
@@ -207,6 +208,128 @@ class Conditional_Intersection(Loss):
         return stats
 
 
+class Conditional_Subset(Loss):
+    '''alpha,*args,lr=1,momentum=0.9,**kwargs
+      Treats the network as an energy model.
+
+      '''
+
+    def __init__(self, alpha, classnum,augmentrate, *args, lr=1, momentum=0.9, **kwargs):
+        # super(Joint_Likelihood_SGD,self).__init__(*args,**kwargs)
+        '''
+
+        :param alpha:
+        :param classnum:
+        :param augmentrate:
+        :param args:
+        :param lr:
+        :param momentum:
+        :param kwargs:
+        '''
+        super().__init__(*args, **kwargs)
+        self.lr = lr
+        self.momentum = momentum
+        self.alpha = alpha
+        self.classnum = classnum
+        self.augment_rate = augmentrate
+
+    def conditional_subset(self, model, inputs, labels, alpha=1,prior_min=-1,prior_max=1):
+        output, logprob = prob_wrapper(model(inputs))[0:2] # quick fix if the model is not probabilistic
+        # output = output.log_softmax(dim=1)
+        # free_energy = self.hyper_normalize(model, inputs,output,prior_min,prior_max ,alpha=alpha)
+        free_energy = (output*alpha).logsumexp(dim=list(range(output.ndim)),keepdim=True)/alpha
+        prediction = output == output.max(dim=1, keepdim=True)[0]
+        prediction = prediction / prediction.sum(dim=1,keepdim=True)
+        one_hot = self.label_to_onehot(output, labels)
+        energy = output - one_hot.log()
+        energy = (-alpha *energy).logsumexp(dim=list(range(energy.ndim)),keepdim=True)/(-alpha)
+
+        model_likelihood = energy - free_energy
+        self.backward(model_likelihood.squeeze())
+        # Gather Stats
+        label_likelihood = one_hot * output
+        label_likelihood[label_likelihood != label_likelihood] = 0
+        label_likelihood = label_likelihood.sum(dim=1).mean().cpu().item()
+        energy = energy.logsumexp(dim=0).squeeze().cpu().item()
+        free_energy = free_energy.cpu().item()
+        model_likelihood = model_likelihood.cpu().item()
+        acc = ((prediction*one_hot).mean(dim=0)).sum().cpu().item()
+        stats = dict(acc=acc,
+                     energy=energy,
+                     free_energy=free_energy,
+                     model_likelihood=model_likelihood,
+                     label_likelihood=label_likelihood)
+        return stats
+
+    def get_lr(self):
+        return self.lr
+
+    def calc_grad(self, model: torch.nn.Module, inputs, labels):
+        alpha = self.alpha
+        stats = self.conditional_subset(model, inputs, labels, alpha=alpha)
+        return stats
+
+class Conditional_Intersection(Loss):
+    '''alpha,*args,lr=1,momentum=0.9,**kwargs
+      Treats the network as an energy model.
+
+      '''
+
+    def __init__(self, alpha, classnum,augmentrate, *args, lr=1, momentum=0.9, **kwargs):
+        # super(Joint_Likelihood_SGD,self).__init__(*args,**kwargs)
+        '''
+
+        :param alpha:
+        :param classnum:
+        :param augmentrate:
+        :param args:
+        :param lr:
+        :param momentum:
+        :param kwargs:
+        '''
+        super().__init__(*args, **kwargs)
+        self.lr = lr
+        self.momentum = momentum
+        self.alpha = alpha
+        self.classnum = classnum
+        self.augment_rate = augmentrate
+
+    def conditional_subset(self, model, inputs, labels, alpha=1,prior_min=-1,prior_max=1):
+        output, logprob = prob_wrapper(model(inputs))[0:2] # quick fix if the model is not probabilistic
+        # output = output.log_softmax(dim=1)
+        # free_energy = self.hyper_normalize(model, inputs,output,prior_min,prior_max ,alpha=alpha)
+        free_energy = (output*alpha).logsumexp(dim=list(range(output.ndim)),keepdim=True)/alpha
+        prediction = output == output.max(dim=1, keepdim=True)[0]
+        prediction = prediction / prediction.sum(dim=1,keepdim=True)
+        one_hot = self.label_to_onehot(output, labels)
+        energy = output + one_hot.log()
+        energy = (energy).logsumexp(dim=list(range(energy.ndim)),keepdim=True)
+
+        model_likelihood = energy - free_energy
+        self.backward(model_likelihood.squeeze())
+        # Gather Stats
+        label_likelihood = one_hot * output
+        label_likelihood[label_likelihood != label_likelihood] = 0
+        label_likelihood = label_likelihood.sum(dim=1).mean().cpu().item()
+        energy = energy.logsumexp(dim=0).squeeze().cpu().item()
+        free_energy = free_energy.cpu().item()
+        model_likelihood = model_likelihood.cpu().item()
+        acc = ((prediction*one_hot).mean(dim=0)).sum().cpu().item()
+        stats = dict(acc=acc,
+                     energy=energy,
+                     free_energy=free_energy,
+                     model_likelihood=model_likelihood,
+                     label_likelihood=label_likelihood)
+        return stats
+
+    def get_lr(self):
+        return self.lr
+
+    def calc_grad(self, model: torch.nn.Module, inputs, labels):
+        alpha = self.alpha
+        stats = self.conditional_subset(model, inputs, labels, alpha=alpha)
+        return stats
+
 class Joint_Cross(Loss):
     '''alpha,*args,lr=1,momentum=0.9,**kwargs
      Treats the network as an energy model.
@@ -268,7 +391,7 @@ class Joint_Cross(Loss):
 
     def calc_grad(self,model:torch.nn.Module,inputs,labels):
         alpha = self.alpha
-        stats = self.joint_probabilistic(model,inputs,labels,alpha=alpha)
+        stats = self.joint_cross(model,inputs,labels,alpha=alpha)
         return stats
 
 
@@ -643,6 +766,7 @@ class Subset_Seg_Balanced(Loss):
     def joint_cross(self, model, inputs, labels, alpha=1,prior_min=-1,prior_max=1):
 
         output, logprob = prob_wrapper(model(inputs))[0:2] # quick fix if the model is not probabilistic
+        print(labels.shape)
         free_energy = self.hyper_normalize(model, inputs, output, prior_min, prior_max, alpha=self.alpha)
         conditional_output = output.log_softmax(dim=1)
         label_prediction = labels == labels.max(dim=1,keepdim=True)[0]
@@ -798,3 +922,249 @@ class Indpt_Seg_Balanced(Loss):
         alpha = self.alpha
         stats = self.joint_cross(model,inputs,labels,alpha=alpha)
         return stats
+
+
+class Cross_Seg_Balanced(Loss):
+    '''alpha,*args,lr=1,momentum=0.9,**kwargs
+     Treats the network as an energy model.
+     The validation set is included as prior
+     The number of validation set is fixed.
+     The upgrade of this Loss is to optimize the size of validation.
+
+     '''
+    def __init__(self,alpha,beta,classnum,*args,lr=1,momentum=0.9,**kwargs):
+        '''
+
+        :param alpha:
+        :param classnum:
+        :param augment_rate: a float between 0:1
+        :param args:
+        :param lr:
+        :param momentum:
+        :param kwargs:
+        '''
+        # super(Joint_Likelihood_SGD,self).__init__(*args,**kwargs)
+        super().__init__(*args,**kwargs)
+        self.lr = lr
+        self.momentum = momentum
+        self.alpha= alpha
+        self.beta = beta
+        self.classnum=classnum
+        self.augment_rate= 0
+
+    def hyper_normalize(self, model, inputs,logprob_prev, min, max, alpha=1):
+        sample = torch.rand_like(inputs) * (max - min) + min
+        output, logprob = prob_wrapper(model(sample))[0:2]
+        free_energy_input = (logprob_prev*alpha).logsumexp(dim=list(range(logprob_prev.dim())))
+        free_energy_sample = (output*alpha).logsumexp(dim=list(range(logprob_prev.dim())))
+        free_energy = softmax(free_energy_input,free_energy_sample)/alpha
+        return free_energy
+    def scores(self,label_true,label_pred):
+        label_true = label_true[0:,0:1,0:]
+        label_pred = label_pred[0:,0:1,0:]
+        intersect = (label_pred*label_true).sum()
+        sum_measure = (label_true+label_pred).sum()
+        dice = 2*intersect/sum_measure
+        IOU = intersect/(sum_measure-intersect)
+        return dice.detach(),IOU.detach()
+
+
+    def joint_cross(self, model, inputs, labels, alpha=1,prior_min=-1,prior_max=1):
+
+        output, logprob = prob_wrapper(model(inputs))[0:2] # quick fix if the model is not probabilistic
+        free_energy = self.hyper_normalize(model, inputs, output, prior_min, prior_max, alpha=self.alpha)
+        conditional_output = output.log_softmax(dim=1)
+        label_prediction = labels == labels.max(dim=1,keepdim=True)[0]
+        label_prediction = label_prediction/label_prediction.sum(dim=1,keepdim=True)
+        label_prediction[0:, 0:1] = label_prediction[0:, 0:1] * (label_prediction[0:, 1:].sum() / label_prediction[0:, 0:1].sum())
+        label_prediction = label_prediction/label_prediction.sum()
+        prediction = output == output.max(dim=1, keepdim=True)[0]
+        prediction = prediction / prediction.sum(dim=1,keepdim=True)
+        # one_hot = self.label_to_onehot(output, labels)
+        energy = (output + label_prediction.log()).logsumexp(dim=1)
+        energy = (energy).mean()
+        # energy [energy != energy] = 0
+        model_likelihood = energy - free_energy
+        self.backward(model_likelihood)
+        # Gather Stats
+        dice,IOU = self.scores(labels,prediction)
+        label_likelihood = labels * conditional_output
+        label_likelihood[label_likelihood!= label_likelihood] = 0
+        label_likelihood = label_likelihood.sum(dim=1).mean().cpu().item()
+        energy = energy.cpu().item()
+        free_energy = free_energy.cpu().item()
+        model_likelihood = model_likelihood.cpu().item()
+        acc = ((prediction*label_prediction).sum(dim=1)).sum().cpu().item()
+        dice = dice.cpu().item()
+        IOU = IOU.cpu().item()
+        stats = dict(acc=acc,
+                     energy=energy,
+                     free_energy=free_energy,
+                     dice= dice,
+                     IOU = IOU,
+                     model_likelihood=model_likelihood,
+                     label_likelihood=label_likelihood)
+        return stats
+
+    def get_lr(self):
+        return self.lr
+
+    def augment_data(self,augment_rate,inputs,labels,num_class):
+        augment_mask = torch.rand((inputs.shape[0],1),device=inputs.device)>augment_rate
+        augment_mask = augment_mask.float()
+        augment_mask_input = augment_mask.unsqueeze(2).unsqueeze(3)
+        augment_mask_label = augment_mask.squeeze()
+        augment_label = torch.randint(num_class,labels.size(),device=labels.device)
+        augment_input = (torch.rand(inputs.shape,device=inputs.device)-0.5)*2
+        augmented_input = inputs*augment_mask_input + augment_input*(1-augment_mask_input)
+        augmented_label = labels*augment_mask_label + augment_label*(1-augment_mask_label)
+        augmented_label = augmented_label.type_as(labels)
+        return augmented_input,augmented_label
+
+    def calc_grad(self,model:torch.nn.Module,inputs,labels):
+        alpha = self.alpha
+        stats = self.joint_cross(model,inputs,labels,alpha=alpha)
+        return stats
+
+
+class Cross_Seg_Balanced_NOEBM(Loss):
+    '''alpha,*args,lr=1,momentum=0.9,**kwargs
+     Treats the network as an energy model.
+     The validation set is included as prior
+     The number of validation set is fixed.
+     The upgrade of this Loss is to optimize the size of validation.
+
+     '''
+    def __init__(self,alpha,beta,classnum,*args,lr=1,momentum=0.9,**kwargs):
+        '''
+
+        :param alpha:
+        :param classnum:
+        :param augment_rate: a float between 0:1
+        :param args:
+        :param lr:
+        :param momentum:
+        :param kwargs:
+        '''
+        # super(Joint_Likelihood_SGD,self).__init__(*args,**kwargs)
+        super().__init__(*args,**kwargs)
+        self.lr = lr
+        self.momentum = momentum
+        self.alpha= alpha
+        self.beta = beta
+        self.classnum=classnum
+        self.augment_rate= 0
+
+    def hyper_normalize(self, model, inputs,logprob_prev, min, max, alpha=1):
+        sample = torch.rand_like(inputs) * (max - min) + min
+        output, logprob = prob_wrapper(model(sample))[0:2]
+        free_energy_input = (logprob_prev*alpha).logsumexp(dim=list(range(logprob_prev.dim())))
+        free_energy_sample = (output*alpha).logsumexp(dim=list(range(logprob_prev.dim())))
+        free_energy = softmax(free_energy_input,free_energy_sample)/alpha
+        return free_energy
+
+    def scores(self,label_true,label_pred):
+        epsilon = 1e-7
+        label_true = label_true[0:,0:1,0:]
+        label_pred = label_pred[0:,0:1,0:]
+        intersect = (label_pred*label_true).sum()
+        sum_measure = (label_true+label_pred).sum()
+        dice = (2*intersect+epsilon)/(sum_measure+epsilon)
+        IOU = (intersect+epsilon)/(sum_measure-intersect + epsilon)
+        return dice.detach(),IOU.detach(),intersect.detach(),sum_measure.detach()
+
+    def joint_cross(self, model, inputs, labels, alpha=1,prior_min=-1,prior_max=1):
+
+        output, logprob = prob_wrapper(model(inputs))[0:2] # quick fix if the model is not probabilistic
+        # print("lableShape: ", labels.shape)
+        # print("output Shape: ", output.shape)
+        # output = interpolate(output,labels.shape[2:],mode='trilinear')
+        free_energy = (output*alpha).logsumexp(dim=1,keepdim=True)/alpha
+        output = output - free_energy
+        # free_energy = self.hyper_normalize(model, inputs, output, prior_min, prior_max, alpha=self.alpha)
+        conditional_output = output.log_softmax(dim=1)
+        label_prediction = labels
+        # label_prediction = labels == labels.max(dim=1,keepdim=True)[0]
+        # label_prediction = label_prediction/label_prediction.sum(dim=1,keepdim=True)
+        # label_prediction[0:, 0:1] = label_prediction[0:, 0:1] * (label_prediction[0:, 1:].sum() / (label_prediction[0:, 0:1].sum()+1))
+        # label_prediction = label_prediction/label_prediction.sum()
+
+        prediction = output == output.max(dim=1, keepdim=True)[0]
+
+        prediction = prediction / prediction.sum(dim=1,keepdim=True)
+        # one_hot = self.label_to_onehot(output, labels)
+        energy = (output*label_prediction).sum(dim=1).sum()
+        # energy [energy != energy] = 0
+        model_likelihood = energy
+        self.backward(model_likelihood)
+        # Gather Stats
+        labels = labels == labels.max(dim=1, keepdim=True)[0]
+        labels = labels/labels.sum(dim=1,keepdim=True)
+        # label_prediction[0:, 0:1] = label_prediction[0:, 0:1] * (label_prediction[0:, 1:].sum() / (label_prediction[0:, 0:1].sum()+1))
+        label_prediction = label_prediction/label_prediction.sum()
+
+
+        dice,IOU,intersect,sum_measure = self.scores(labels,prediction)
+        label_likelihood = labels * conditional_output
+        label_likelihood[label_likelihood!= label_likelihood] = 0
+        label_likelihood = label_likelihood.sum(dim=1).mean().cpu().item()
+        energy = energy.cpu().item()
+        free_energy = free_energy.mean().cpu().item()
+        model_likelihood = model_likelihood.cpu().item()
+        acc = ((prediction*label_prediction).sum(dim=1)).sum().cpu().item()
+        dice = dice.cpu().item()
+        IOU = IOU.cpu().item()
+        stats = dict(acc=acc,
+                     energy=energy,
+                     free_energy=free_energy,
+                     dice= dice,
+                     IOU = IOU,
+                     intersect=intersect,
+                     Sum=sum_measure,
+                     model_likelihood=model_likelihood,
+                     label_likelihood=label_likelihood)
+        return stats
+
+    def get_lr(self):
+        return self.lr
+
+    def augment_data(self,augment_rate,inputs,labels,num_class):
+        augment_mask = torch.rand((inputs.shape[0],1),device=inputs.device)>augment_rate
+        augment_mask = augment_mask.float()
+        augment_mask_input = augment_mask.unsqueeze(2).unsqueeze(3)
+        augment_mask_label = augment_mask.squeeze()
+        augment_label = torch.randint(num_class,labels.size(),device=labels.device)
+        augment_input = (torch.rand(inputs.shape,device=inputs.device)-0.5)*2
+        augmented_input = inputs*augment_mask_input + augment_input*(1-augment_mask_input)
+        augmented_label = labels*augment_mask_label + augment_label*(1-augment_mask_label)
+        augmented_label = augmented_label.type_as(labels)
+        return augmented_input,augmented_label
+
+    def calc_grad(self,model:torch.nn.Module,inputs,labels):
+        alpha = self.alpha
+        stats = self.joint_cross(model,inputs,labels,alpha=alpha)
+        return stats
+
+class Intersection_InputNoise(Loss):
+
+    def __init__(self,*args, **kwargs):
+        super(Intersection_InputNoise, self).__init__(*args, **kwargs)
+
+    def add_noise(self, inputs):
+        ### We randomly sample. from noisy input
+        pass
+        ### we have log probability of the sample
+        pass
+        ### we can calculate how much information about input is contained in the output, given the current sampling?
+        pass
+        ### output the information content.
+
+
+
+    def calc_grad(self,model,inputs,labels):
+        """ labels of the size n,1"""
+
+        output = model(inputs)
+
+        """ The options are to normalize individually or to normalize as a batch"""
+

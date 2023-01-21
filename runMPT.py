@@ -30,12 +30,12 @@ if __name__ == '__main__':
 	augment_rate = 0
 	exp_list = []
 	total_trials= 1
-	datasets= [(cifar10,10),(cifar100,100),(mnist,10)]
+	datasets= [(cifar10,10)]
 
 	alpha_list=[1,2,3,4,5,6]
 	l1_list = [0]
 	l2_list = l1_list
-	numlayers_list= [8, 12, 16]
+	numlayers_list= [12]
 	lr_list = [0.001,0.0001]
 	init_coef_list = [1,0.1]
 	optimizer_list = [SGD]
@@ -43,7 +43,10 @@ if __name__ == '__main__':
 				 Joint_Cross,
 				 Joint_Intersection_Subset,
 				 Joint_Intersection_Indpt]
-	model_list = [BottleNet,SimpleCIFAR10,resnet_cifar_nmnist]
+	model_list = [BottleNet
+				  # SimpleCIFAR10,
+				  # resnet_cifar_nmnist
+				  ]
 
 
 	for trial in range(total_trials):

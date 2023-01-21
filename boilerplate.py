@@ -3,49 +3,39 @@ import sys
 
 global server_mode
 from src.experiments import *
-from torch.optim import Adam
+
 if __name__ == '__main__':
 
     # exp = NIN_Dropout(1)
-    ''' Detect panc on NIH
-	1. create
-
-	'''
-    ''' Detect Panc on Mayo'''
-    ''' Train EBM on NIH and MAYO'''
-    ''' TEST Phase'''
-    desc = "This experiment is designed to test variation of alpha param and multiple loss functions" \
-           "\nThe loss functions are as followed:\n" \
-           "\n1. Cross Entropy Conditional/Joint\n" \
-           "\nCross Entropy means that each sample affects the network independantly\n" \
-           "\nCond/Joint reflect that the network is trained on input/label ( joint) or just the label (Cond) " \
-           "" \
-           "\n2. Probabilistic Conditional/Joint" \
-           "\nIn Probabilistic Training each sample affects the gradient based on the probability of correctness." \
-           "\n In other words, the marginalized probability, is optimized" \
-           "" \
-           "" \
-           "In addition to the previous objecrtive function a v2 for Joint version is experimented:\n" \
-           "where in hyper normalization as opposed to the original, the original input is not used."
+    desc = '''Experimenting with Bottle Net. BottleNet aggregates the output across layers to 
+     combat gradient vanishing. '''
     augment_rate = 0
     exp_list = []
-    total_trials = [2]
-    datasets = [(nih_pancreas2d, 2)]
+    total_trials = ['max-min']
+    datasets = [(cifar10, 10)]
 
-    alpha_list = [1]
+    alpha_list = [4,2,1]
     l1_list = [0]
     l2_list = l1_list
     numlayers_list = [24]
     lr_list = [0.001]
-    init_coef_list = [3]
+    init_coef_list = [2]
     optimizer_list = [SGD]
-    loss_list = [Cross_Seg_Balanced_NOEBM]
-    model_list = [Panc_Seg_Bottled_FullScale_2D]
     scale_list = [1]
-
+    loss_list = [
+                Conditional_Subset,
+                Conditional_Intersection
+                 # Joint_Cross,
+                 # Joint_Intersection_Subset,
+                 # Joint_Intersection_Indpt
+    ]
+    model_list = [BottleNet
+                  # SimpleCIFAR10,
+                  # resnet_cifar_nmnist
+                  ]
 
     for trial in total_trials:
-        for batch_size in [1]:
+        for batch_size in [128]:
             for alpha in alpha_list:
                 for numlayers in numlayers_list:
                     for dataset, classnum in datasets:
@@ -84,7 +74,7 @@ if __name__ == '__main__':
         exp_list = exp_list[worker_id::total_workers]
     print("This worker is experimenting on total of %d settings" % exp_list.__len__())
     for exp_dict in exp_list:
-        exp = Trainings_SimpleCIFAR10('Full_Scale', description=desc, worker_id=worker_id)
+        exp = Trainings_SimpleCIFAR10('BottleNet', description=desc, worker_id=worker_id)
         exp.generic_train(**exp_dict)
 #
 

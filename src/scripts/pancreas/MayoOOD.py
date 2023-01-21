@@ -12,13 +12,17 @@ import pandas as pd
 from pandas import DataFrame as DataFrame
 from sklearn.metrics import roc_auc_score
 import numpy as np
+from src.utils import dict_to_str
 import monai.data.nifti_writer as nifti_writer
 def odin_score(input:torch.Tensor,model,epsilon=0.0001):
-    input.requires_grad = True
-    output = model(input).logsumexp(dim=1).mean()
-    output.backward()
-    input2 = (input + input.grad.data * epsilon).detach()
-    print(input.grad.data.abs().sum())
+    input2 = input.clone()
+    input2.requires_grad = True
+    for i in range(4):
+        output = model(input2).logsumexp(dim=1).mean()
+        output.backward()
+        input2.data = (input2.data + input2.grad.data * epsilon).detach()
+        input2.grad.data = input2.grad.data*0
+    # print(input.grad.data.abs().sum())
     with torch.no_grad():
         output = model(input2).logsumexp(dim=1)
     return output.detach()
@@ -57,7 +61,7 @@ def visualize(model,dataloader,modelname):
         nifti_writer.write_nifti(prediction.cpu().numpy(),nifti_path)
         nifti_writer.write_nifti(input, nifti_path_orig)
         i = i + 1
-        if i > 3:
+        if i > 10:
             break
 
     return
@@ -70,7 +74,7 @@ def eval_model(model,dataloader,modelname):
         input = input.to('cuda:0')
         energy = model(input)
         prediction = (energy == energy.max(dim=1,keepdim=True)[0])[0:,0:1].float()
-        odinscore = odin_score(input,model,epsilon=100)
+        odinscore = odin_score(input,model,epsilon=10000)
         max_energy = max_energy_score(energy)
         energy_score = calc_energy_score(energy)
         softmax = softmax_score(energy)
@@ -85,14 +89,14 @@ def eval_model(model,dataloader,modelname):
                         odin=odinscore.squeeze().cpu().item(),
                         softmax=softmax.cpu().numpy(),
                         label=label.squeeze().cpu().item())
-        # print(temp_dict)
+        print(dict_to_str(temp_dict))
         df = df.append(temp_dict,ignore_index=True)
         i = i+1
 
         # if i > 10:
         #     summ = create_summary_entry(df)
         #     print(i, dataloader.__len__(), 'auroc ->' , summ )
-        if i > 3:
+        if i > 20:
             break
 
     return df
@@ -123,7 +127,7 @@ def create_summary_entry(df:DataFrame)->dict:
 
 if __name__ == '__main__':
     if sys.argv.__len__()<2:
-        expname = 'SortedValueExp'
+        expname = 'Selected'
     else:
         expname = sys.argv[1]
     # print("Evaluating " + expname + " on Mayo")
@@ -146,12 +150,12 @@ if __name__ == '__main__':
         compact_res = dict(acc = scalar_dict['acc_val  '][-1],dice= scalar_dict['dice_val  '][-1],IOU=scalar_dict['IOU_val  '][-1])
         model = torch.load(model_path)# type:torch.Module
         model.to('cuda:0')
-        df = visualize(model,dataloader_mayo,setup_dict['model_name'])
-        # df = eval_model(model,dataloader_mayo,setup_dict['model_name']) # df contains per model energy scores and labels
+        # df = visualize(model,dataloader_mayo,setup_dict['model_name'])
+        df = eval_model(model,dataloader_mayo,setup_dict['model_name']) # df contains per model energy scores and labels
 
         # calculate AUROC
-        # summary_dict = create_summary_entry(df)
-        # print(summary_dict, setup_dict,compact_res)
+        summary_dict = create_summary_entry(df)
+        print(summary_dict, setup_dict,compact_res)
         # summary_dict = summary_dict.update(summary_dict)
         # summary_dict = summary_dict.update(setup_dict)
         # summary_df.append(DataFrame(summary_dict),ignore_index=True)
