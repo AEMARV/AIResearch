@@ -362,6 +362,7 @@ class Joint_Cross(Loss):
         return self.lr
 
     def joint_cross(self, model, inputs, labels, alpha=1, prior_min=-1, prior_max=1):
+
         output, logprob = prob_wrapper(model(inputs))[0:2]  # quick fix if the model is not probabilistic
         output = output+logprob
         free_energy = self.hyper_normalize(model, inputs, output, prior_min, prior_max, alpha=alpha)
@@ -1144,27 +1145,3 @@ class Cross_Seg_Balanced_NOEBM(Loss):
         alpha = self.alpha
         stats = self.joint_cross(model,inputs,labels,alpha=alpha)
         return stats
-
-class Intersection_InputNoise(Loss):
-
-    def __init__(self,*args, **kwargs):
-        super(Intersection_InputNoise, self).__init__(*args, **kwargs)
-
-    def add_noise(self, inputs):
-        ### We randomly sample. from noisy input
-        pass
-        ### we have log probability of the sample
-        pass
-        ### we can calculate how much information about input is contained in the output, given the current sampling?
-        pass
-        ### output the information content.
-
-
-
-    def calc_grad(self,model,inputs,labels):
-        """ labels of the size n,1"""
-
-        output = model(inputs)
-
-        """ The options are to normalize individually or to normalize as a batch"""
-
