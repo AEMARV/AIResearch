@@ -265,6 +265,8 @@ class Trainings_SimpleCIFAR10(Experiment):
                      alpha=alpha,
                      batchsz=batchsz,
                      lr=lr,
+                     l2 = l2,
+                     l1 = l1,
                      layers=num_layer,
                      trial=trial
                      )
