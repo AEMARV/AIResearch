@@ -11,12 +11,10 @@ from src.layers import Sampler
 import math
 from src.utils import softmax
 from monai.networks.nets import UNet
+import math
 
 
-class ProbModel(nn.Module):
-    def __init__(self, *args, input_shape=(1,3,1,1), **kwargs):
-        super(ProbModel, self).__init__(*args, **kwargs)
-        """ Noise should be broadcastable to input"""
+
 
 
 
@@ -162,6 +160,7 @@ class BottleNet(nn.Module):
         return -y
 
 
+
 class BottleNetMax(nn.Module):
     def __init__(self, layers=12, classnum=10, num_filter=64, filter_scale=1,init_coef=1):
         num_filter = math.ceil(num_filter * filter_scale)
@@ -239,7 +238,15 @@ class BottleNetMax(nn.Module):
 ''' Digital Models'''
 class DPN_CIFAR10FC(nn.Module):
 
-    def __init__(self,layers=12,classnum=-1,num_filter=64,filter_scale=1):
+    def __init__(self,layers=12,classnum=-1,num_filter=64,filter_scale=1, generator_layers=2):
+        '''
+
+        :param layers:
+        :param classnum:
+        :param num_filter:
+        :param filter_scale:
+        :param generator_layers: the layers are
+        '''
         super().__init__()
         num_filter = num_filter * filter_scale
         layer = torch.nn.Conv2d(3, num_filter, (3, 3), stride=(1, 1), padding=0)

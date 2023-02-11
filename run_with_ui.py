@@ -10,7 +10,7 @@ import multiprocessing as mp
 from multiprocessing import Queue as Queue
 from PyQt6.QtWidgets import QApplication, QWidget,QMainWindow
 import sys
-
+import pygames
 
 class hyperparam():
     possible_types = ['num','choice']
