@@ -33,7 +33,7 @@ if __name__ == '__main__':
 	datasets= [(cifar10,10),(cifar100,100), (mnist, 10)]
 
 	alpha_list=[1,2,3,4,5,6,12,24]
-	l1_list = [0]
+	l1_list = [0,2e-5,1e-4]
 	l2_list = l1_list
 	numlayers_list= [12]
 	lr_list = [0.1, 0.01, 0.001,0.0001]
